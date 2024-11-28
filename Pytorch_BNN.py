@@ -1,3 +1,8 @@
+"""
+Complex set of data are generated.
+A Bayesian neural network is trained and compared to its determinitstic counterpart.
+"""
+
 # %%
 import torch
 import torch.nn as nn
