@@ -1,3 +1,9 @@
+"""
+This script allow to investigate the SHAP value extracted from a pytorch model.
+In addition to "first-order" shap value, higher-order SHAP values are obtain from feature masking.
+The difference between first and higher order SHAP values should give some insight into features interaction.
+"""
+
 # %%
 import torch
 import torch.nn as nn
