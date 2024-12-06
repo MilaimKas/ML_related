@@ -79,8 +79,8 @@ def simulate_feature_drift(X, drift_feature_idx, drift_prop_max=2., time_period=
     
     return X_drifted
 
-def make_data(weigths = [0.4, 0.6], drift=False, num_features=10, n_informative=8):
-    X, y = make_classification(n_samples=50000, n_features=num_features, n_informative=n_informative, n_classes=2, random_state=42, weights=weigths)
+def generate_data_sklearn(num_samples=1000, num_features=10, weigths = [0.4, 0.6], drift=False, n_informative=8):
+    X, y = make_classification(n_samples=num_samples, n_features=num_features, n_informative=n_informative, n_classes=2, random_state=42, weights=weigths)
     # add driftet features
     if drift:
         X = simulate_feature_drift(X, drift_feature_idx=[0, 1, 2, 3], drift_prop_max=2.0)
