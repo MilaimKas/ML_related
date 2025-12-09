@@ -43,6 +43,10 @@ import pprint
 
 class TextCluster:
     def __init__(self, word_list, cnt_thresh=20):
+        """
+        word_list: list of words or sentences to be clustered
+        cnt_thresh: minimum count threshold to keep a word in the analysis
+        """
 
         self.word_list = word_list
         self.word_dict = {k:v for k, v in Counter(word_list).items() if v > cnt_thresh}
@@ -56,6 +60,9 @@ class TextCluster:
         cluster_method = None
 
     def plot_word_raw(self, plt_kargs={}, xticks_kwargs={}):
+        """
+        Plot raw word counts as a bar chart
+        """
         plt.bar(self.word_df["words"], self.word_df["count"], **plt_kargs)
         plt.xticks(rotation= 90, **xticks_kwargs)
         plt.ylabel("Count")
@@ -63,7 +70,9 @@ class TextCluster:
         plt.show()
 
     def wordcloud_raw(self):
-        # word clouds
+        """
+        Plot raw word counts as a wordcloud
+        """
         wordcloud = WordCloud(max_font_size=50, max_words=100, background_color="white").generate_from_frequencies(self.topic_dict)
         plt.figure()
         plt.imshow(wordcloud, interpolation="bilinear")
@@ -71,6 +80,9 @@ class TextCluster:
         plt.show()
     
     def get_embendings(self, model='sentence-transformers/all-MiniLM-L6-v2', llm_context=None):
+        """
+        Get embeddings for the words using SBERT model
+        """
         # other possible model: "hkunlp/instructor-large"
         
         if llm_context is not None:
@@ -85,7 +97,12 @@ class TextCluster:
         return self.embeddings
     
     def make_cluster(self, type="kmeans", num_clusters=20):
+        """
+        Cluster the words using the specified clustering method
         
+        type: clustering method, can be "kmeans", "spectral" or "community"
+        num_clusters: number of clusters to form
+        """
         if self.embeddings is None:
             self.get_embendings()
         
@@ -115,7 +132,10 @@ class TextCluster:
         for word, label in zip(self.word_df.words.to_list(), self.labels):
             self.clusters[label].append(word.strip())
 
-    def community_labels(self, num_clusters):
+    def community_labels(self):
+        """
+        Cluster the words using community detection on a k-NN graph
+        """
         if self.graph is None:
             self.construct_graph()
         # Convert adjacency matrix to NetworkX graph
@@ -126,6 +146,9 @@ class TextCluster:
         return labels
     
     def spectral_labels(self, num_clusters):
+        """
+        Cluster the words using spectral clustering on a k-NN graph
+        """
         if self.graph is None:
             self.construct_graph()
         # Perform spectral clustering
@@ -134,11 +157,18 @@ class TextCluster:
         return labels
 
     def kmeans_labels(self, num_clusters):
+        """
+        Cluster the words using k-means clustering
+        """
         kmeans = KMeans(n_clusters=num_clusters, random_state=0)
         kmeans.fit(self.embeddings)
         return kmeans.labels_
     
     def construct_graph(self, n_neighbors=10):
+        """
+        Construct a k-NN graph from the embeddings
+        n_neighbors: number of neighbors to use for k-NN graph
+        """
         if self.embeddings is None:
             self.get_embendings()
         # Construct k-NN graph
@@ -147,7 +177,14 @@ class TextCluster:
         return self.graph
 
     def name_cluster(self, model="HuggingFaceTB/SmolLM2-1.7B-Instruct", prompt=None, device="cpu", max_items=100):
+        """
+        Name each cluster using a generative LLM
         
+        model: HuggingFace model name
+        prompt: prompt to use for naming the cluster
+        device: device to use for LLM inference
+        max_items: maximum number of items to include in the prompt
+        """
         if not self.clusters:
             raise ValueError("The clusters must first be generated. Call the make_clusters() function")
         
@@ -182,6 +219,11 @@ class TextCluster:
             self.cluster_name.update({i: response})
 
     def plot_silhouette(self, type="kmeans", k_range=[10, 50]):
+        """
+        Plot silhouette scores for different number of clusters
+        type: clustering method, can be "kmeans", "spectral" or "community" 
+        k_range: range of number of clusters to test
+        """
 
         # Perform K-means clustering
         if type == "kmeans":
@@ -219,12 +261,15 @@ class TextCluster:
 
 
     def print_clusters(self):
-        # Prints the nicely formatted dictionary
+        """
+        Prints the nicely formatted dictionary
+        """
         pprint.pprint(self.clusters)
     
     def plot_clusters(self):
-        
-        # plot clusterd topics
+        """
+        plot clusterd topics
+        """
         tmp = self.word_df.groupby("labels")["count"].sum().reset_index().sort_values("count", ascending=False)
         plt.bar(tmp["labels"], tmp["count"])
         plt.xticks(rotation= 90)
