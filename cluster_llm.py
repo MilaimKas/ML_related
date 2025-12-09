@@ -13,6 +13,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn.neighbors import kneighbors_graph
+from sklearn.cluster import SpectralClustering
+
+from scipy.sparse import csgraph
+import networkx as nx
+from community import community_louvain
 
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 import spacy
@@ -34,7 +40,7 @@ import textwrap
 import pprint
 
 
-class WordCluster:
+class TextCluster:
     def __init__(self, word_list, cnt_thresh=20):
 
         self.word_list = word_list
@@ -46,7 +52,7 @@ class WordCluster:
         
         self.cluster_name = None
         self.clusters = None
-
+        cluster_method = None
 
     def plot_word_raw(self, plt_kargs={}, xticks_kwargs={}):
         plt.bar(self.word_df["words"], self.word_df["count"], **plt_kargs)
@@ -77,7 +83,7 @@ class WordCluster:
         
         return self.embeddings
     
-    def make_cluster(self, num_clusters=20):
+    def make_cluster(self, type="kmeans", num_clusters=20):
         
         if self.embeddings is None:
             self.get_embendings()
@@ -88,10 +94,18 @@ class WordCluster:
         # Cluster topics using embedding
         
         # Perform K-means clustering
-        kmeans = KMeans(n_clusters=num_clusters, random_state=0)
-        kmeans.fit(self.embeddings)
-        self.labels = kmeans.labels_
+        if type == "kmeans":
+            self.labels = self.kmeans_labels(num_clusters)
+
+        elif type == "spectral":
+            self.labels = self.spectral_labels(num_clusters)
+
+        elif type == "community":
+            self.labels = self.community_labels()
         
+        else:
+            raise ValueError(f"type must be kmeans, spectral or community, got {type}")
+
         # add labels 
         self.word_df["labels"] = self.labels.astype(str)
 
@@ -99,7 +113,38 @@ class WordCluster:
         self.clusters = {i: [] for i in range(num_clusters)}
         for word, label in zip(self.word_df.words.to_list(), self.labels):
             self.clusters[label].append(word.strip())
+
+    def community_labels(self, num_clusters):
+        if self.graph is None:
+            self.construct_graph()
+        # Convert adjacency matrix to NetworkX graph
+        G = nx.from_scipy_sparse_matrix(self.graph)
+        # Perform community detection
+        partition = community_louvain.best_partition(G)
+        labels = [partition[i] for i in range(len(self.word_list))]
+        return labels
     
+    def spectral_labels(self, num_clusters):
+        if self.graph is None:
+            self.construct_graph()
+        # Perform spectral clustering
+        spectral = SpectralClustering(n_clusters=num_clusters, affinity='precomputed', random_state=42)
+        labels = spectral.fit_predict(self.graph.toarray())
+        return labels
+
+    def kmeans_labels(self, num_clusters):
+        kmeans = KMeans(n_clusters=num_clusters, random_state=0)
+        kmeans.fit(self.embeddings)
+        return kmeans.labels_
+    
+    def construct_graph(self, n_neighbors=10):
+        if self.embeddings is None:
+            self.get_embendings()
+        # Construct k-NN graph
+        adjacency_matrix = kneighbors_graph(self.embeddings, n_neighbors, mode='connectivity', include_self=False)
+        self.graph = adjacency_matrix
+        return self.graph
+
     def name_cluster(self, model="HuggingFaceTB/SmolLM2-1.7B-Instruct", prompt=None, device="cpu", max_items=100):
         
         if not self.clusters:
@@ -135,7 +180,20 @@ class WordCluster:
             
             self.cluster_name.update({i: response})
 
-    def plot_silhouette(self, k_range=[10, 50]):
+    def plot_silhouette(self, type="kmeans", k_range=[10, 50]):
+
+        # Perform K-means clustering
+        if type == "kmeans":
+            clustering_method = self.kmeans_labels
+
+        elif type == "spectral":
+            clustering_method = self.spectral_labels
+
+        elif type == "community":
+            clustering_method = self.community_labels
+        
+        else:
+            raise ValueError(f"type must be kmeans, spectral or community, got {type}")
         
         if self.embeddings is None:
             self.get_embendings()
@@ -147,14 +205,13 @@ class WordCluster:
         k_values = range(k_range[0], k_range[1])  # Test for k=2 to k=20
 
         for k in k_values:
-            kmeans = KMeans(n_clusters=k, random_state=42)
-            kmeans.fit(self.embeddings)
-            silhouette_scores.append(silhouette_score(self.embeddings, kmeans.labels_))
+            labels = clustering_method(k)
+            silhouette_scores.append(silhouette_score(self.embeddings, labels))
 
         # Plot Silhouette Scores
         plt.figure(figsize=(10, 5))
         plt.plot(k_values, silhouette_scores, marker='o')
-        plt.title("Silhouette Analysis")
+        plt.title(f"Silhouette Analysis using the {type} clustering")
         plt.xlabel("Number of Clusters (k)")
         plt.ylabel("Silhouette Score")
         plt.show()
