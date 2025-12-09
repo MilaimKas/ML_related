@@ -1,3 +1,8 @@
+"""
+This file contains a class that performs clustering of words and/or sentences using vector embedding and k-means
+In addition, the cluster can be named using a call to generative LLM with appropriate prompt.
+"""
+
 # Import python packages
 import pandas as pd
 import numpy as np
@@ -25,10 +30,6 @@ import spacy
 # Load the English model
 nlp = spacy.load("en_core_web_sm")
 from collections import Counter
-"""
-This file contains a class that performs clustering of words and/or sentences using vector embedding and k-means
-In addition, the cluster can be named using a call to generative LLM with appropriate prompt.
-"""
 
 from itertools import islice
 
